@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: unified_inbox
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # # Redis for session storage (optional)
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: always
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+
+  # Unified Inbox Application
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Next.js server
+      - "8080:8080"   # WebSocket server
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/unified_inbox
+      
+      # Auth
+      - BETTER_AUTH_SECRET=docker-secret-key-change-in-production
+      - BETTER_AUTH_URL=http://localhost:3000
+      
+      # Base URL for webhooks
+      - BASE_URL=http://localhost:3000
+      
+      # Twilio (use your real credentials or set in .env)
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
+      
+      # Resend (optional)
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      
+      # Cron secret
+      - CRON_SECRET=docker-cron-secret
+      
+      # Node environment
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  postgres_data:
+  # redis_data:

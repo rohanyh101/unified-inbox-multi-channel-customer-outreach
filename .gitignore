@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,214 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+/prisma/migrations/migration_lock.toml
+*.db
+*.sqlite
+*.sqlite3
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# coverage directory used by tools like istanbul
+lib-cov
+
+# nyc test coverage
+.nyc_output
+
+# grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# dependency directories
+node_modules/
+jspm_packages/
+
+# snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
+# typescript cache
+*.tsbuildinfo
+
+# optional npm cache directory
+.npm
+
+# optional eslint cache
+.eslintcache
+
+# optional stylelint cache
+.stylelintcache
+
+# microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# optional REPL history
+.node_repl_history
+
+# output of 'npm pack'
+*.tgz
+
+# yarn integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+out
+
+# nuxt.js build / generate output
+.nuxt
+dist
+
+# gatsby files
+.cache/
+public
+
+# vuepress build output
+.vuepress/dist
+
+# vuepress v2.x temp and cache directory
+.temp
+.cache
+
+# docusaurus cache and generated files
+.docusaurus
+
+# serverless directories
+.serverless/
+
+# fusebox cache
+.fusebox/
+
+# dynamodb local files
+.dynamodb/
+
+# ternjs port file
+.tern-port
+
+# stores vscode versions used for testing vscode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# macos
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# thumbnails
+._*
+
+# files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# directories potentially created on remote afp share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+
+# dump file
+*.stackdump
+
+# folder config file
+[Dd]esktop.ini
+
+# recycle bin used on file shares
+$RECYCLE.BIN/
+
+# windows installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# windows shortcuts
+*.lnk
+
+# ides and editors
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# jetbrains ides
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# project specific
+/app/generated/prisma
+/uploads
+/tmp
+/temp
+
+# backup files
+*.backup
+*.bak
+*.tmp
+
+# security and keys
+*.key
+*.pem
+*.p12
+*.crt
+*.cert
+*.csr
+
+# local development
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

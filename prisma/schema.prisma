@@ -1,0 +1,285 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  VIEWER
+  EDITOR  
+  ADMIN
+}
+
+enum MessageChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum ScheduledMessageStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  name          String?
+  image         String?
+  role          UserRole @default(VIEWER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  contacts         Contact[]
+  messages         Message[]
+  notes            Note[]
+  scheduledMessages ScheduledMessage[]
+  sessions         Session[]
+  accounts         Account[]
+  mentions         NoteMention[]
+  presence         UserPresence[]
+  messageTemplates MessageTemplate[] @relation("MessageTemplates")
+  uploadedMedia    MediaAttachment[] @relation("UploadedMedia")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id         String   @id @default(cuid())
+  accountId  String   @unique
+  providerId String
+  userId     String
+  accessToken String?
+  refreshToken String?
+  idToken    String?
+  expiresAt  DateTime?
+  password   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Contact {
+  id            String   @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  socialHandles Json?    // Store social media handles as JSON
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  createdBy   String
+  createdByUser User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  
+  messages          Message[]
+  notes             Note[]
+  scheduledMessages ScheduledMessage[]
+  userPresence      UserPresence[]
+
+  // Indexes
+  @@index([createdBy])
+  @@index([phone])
+  @@index([email])
+  @@map("contacts")
+}
+
+model Message {
+  id        String           @id @default(cuid())
+  channel   MessageChannel
+  direction MessageDirection
+  content   String
+  mediaUrl  String?         // For MMS attachments
+  status    MessageStatus   @default(PENDING)
+  timestamp DateTime        @default(now())
+  metadata  Json?           // Store error codes, delivery info, etc.
+  
+  // Relations
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  
+  attachments MediaAttachment[] @relation("MessageAttachments")
+
+  // External IDs for webhook correlation
+  twilioSid String? @unique
+  
+  // Indexes  
+  @@index([contactId, timestamp])
+  @@index([channel, status])
+  @@index([twilioSid])
+  @@map("messages")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  content   String
+  isPrivate Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  
+  // Threading support
+  parentId String?
+  parent   Note?   @relation("NoteReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Note[]  @relation("NoteReplies")
+  
+  // Relations
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  authorId String
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  // Mentions
+  mentions NoteMention[]
+
+  // Indexes
+  @@index([contactId])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("notes")
+}
+
+model NoteMention {
+  id     String @id @default(cuid())
+  noteId String
+  userId String
+  
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([noteId, userId])
+  @@map("note_mentions")
+}
+
+model UserPresence {
+  id           String   @id @default(cuid())
+  userId       String
+  contactId    String?
+  action       String   // "viewing_contact", "editing_note", "typing_message"
+  lastSeenAt   DateTime @default(now())
+  metadata     Json?    // Additional context like note_id, message_id
+  
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, contactId, action])
+  @@index([contactId])
+  @@index([lastSeenAt])
+  @@map("user_presence")
+}
+
+model ScheduledMessage {
+  id          String                 @id @default(cuid())
+  channel     MessageChannel
+  content     String
+  mediaUrl    String?
+  scheduledAt DateTime
+  status      ScheduledMessageStatus @default(PENDING)
+  createdAt   DateTime              @default(now())
+  
+  // Relations
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  authorId String
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([scheduledAt, status])
+  @@index([contactId])
+  @@map("scheduled_messages")
+}
+
+// Message Templates for reusable content
+model MessageTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  content     String   @db.Text
+  category    String
+  variables   String[] // Array of variable names like ['name', 'date']
+  usageCount  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  authorId    String
+  author      User     @relation("MessageTemplates", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([authorId])
+  @@index([category])
+  @@index([isActive])
+  @@map("message_templates")
+}
+
+// Media attachments for messages (separate table for better organization)
+model MediaAttachment {
+  id          String   @id @default(cuid())
+  filename    String
+  originalName String
+  mimeType    String
+  size        Int      // Size in bytes
+  url         String   // URL to the file
+  thumbnailUrl String? // Thumbnail for images/videos
+  duration    Int?     // Duration in seconds for audio/video
+  metadata    Json?    // Additional metadata (dimensions, etc.)
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  messageId   String?
+  message     Message? @relation("MessageAttachments", fields: [messageId], references: [id], onDelete: Cascade)
+  
+  uploadedById String
+  uploadedBy   User     @relation("UploadedMedia", fields: [uploadedById], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([messageId])
+  @@index([uploadedById])
+  @@index([mimeType])
+  @@map("media_attachments")
+}
