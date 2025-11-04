@@ -92,9 +92,17 @@ export async function POST(
       select: { role: true },
     })
 
-    if (!user || user.role === 'VIEWER') {
+    if (!user) {
       return NextResponse.json(
-        { message: 'Insufficient permissions' },
+        { message: 'User not found' },
+        { status: 404 }
+      )
+    }
+
+    // Allow EDITOR and ADMIN roles to create notes
+    if (user.role !== 'EDITOR' && user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { message: 'Insufficient permissions. Only EDITOR and ADMIN users can create notes.' },
         { status: 403 }
       )
     }

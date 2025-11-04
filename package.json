@@ -20,6 +20,7 @@
     "db:reset-seed": "prisma db push --force-reset && npm run db:seed",
     "db:migrate-init": "prisma migrate dev --name init",
     "setup-admin": "tsx scripts/setup-admin.ts",
+    "setup-editor": "tsx scripts/setup-editor.ts",
     "demote-admin": "tsx scripts/demote-admin.ts",
     "scheduler:run": "curl -X POST http://localhost:3000/api/cron/process-scheduled-messages -H 'Authorization: Bearer dev-secret-key'",
     "ws:dev": "node websocket-server.js"
