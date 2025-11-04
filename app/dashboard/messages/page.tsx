@@ -133,6 +133,16 @@ export default function MessagesPage() {
           };
           setSelectedThread(emptyThread);
           setSelectedContact(contactIdFromUrl);
+          
+          // Also add to contactThreads so it appears in sidebar
+          setContactThreads(prevThreads => {
+            const threadExists = prevThreads.some(t => t.contact.id === contactIdFromUrl);
+            if (!threadExists) {
+              console.log('➕ Adding thread to sidebar');
+              return [emptyThread, ...prevThreads];
+            }
+            return prevThreads;
+          });
         } else {
           console.log('❌ Contact not found in contacts list:', contactIdFromUrl);
           console.log('❌ Available contact IDs:', contacts.map(c => c.id));
