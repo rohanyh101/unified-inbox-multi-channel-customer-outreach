@@ -144,6 +144,7 @@ export default function AnalyticsPage() {
     }
   }
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -162,22 +163,15 @@ export default function AnalyticsPage() {
         </header>
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="space-y-8">
-            <div className="text-center max-w-3xl mx-auto">
-              <p className="text-lg text-gray-600">Loading your analytics...</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader className="pb-3">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-8 bg-gray-200 rounded w-16"></div>
-                  </CardContent>
-                </Card>
-              ))}
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center">
+              <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-gray-500 bg-white">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading your analytics...
+              </div>
             </div>
           </div>
         </main>
@@ -185,6 +179,7 @@ export default function AnalyticsPage() {
     )
   }
 
+  // Show welcome message for new users (no data yet)
   if (!analyticsData) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -287,7 +282,7 @@ export default function AnalyticsPage() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData.overview.totalMessages.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{analyticsData?.overview?.totalMessages?.toLocaleString() || '0'}</div>
             <p className="text-xs text-muted-foreground">
               Sent and received in {getDateRangeLabel(dateRange).toLowerCase()}
             </p>
@@ -300,7 +295,7 @@ export default function AnalyticsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData.overview.totalContacts}</div>
+            <div className="text-2xl font-bold">{analyticsData?.overview?.totalContacts || 0}</div>
             <p className="text-xs text-muted-foreground">
               Contacts you've messaged with
             </p>
@@ -313,7 +308,7 @@ export default function AnalyticsPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatResponseTime(analyticsData.overview.avgResponseTime)}</div>
+            <div className="text-2xl font-bold">{formatResponseTime(analyticsData?.overview?.avgResponseTime || 0)}</div>
             <p className="text-xs text-muted-foreground">
               Average time to respond
             </p>
@@ -326,7 +321,7 @@ export default function AnalyticsPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData.overview.engagementRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{(analyticsData?.overview?.engagementRate || 0).toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
               Messages that got responses
             </p>
@@ -351,19 +346,19 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-600">Average Response Time</p>
-                <p className="text-2xl font-bold text-blue-600">{analyticsData.responseMetrics.avgResponseTime}</p>
+                <p className="text-2xl font-bold text-blue-600">{analyticsData?.responseMetrics?.avgResponseTime || '0m'}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-600">Median Response Time</p>
-                <p className="text-2xl font-bold text-green-600">{analyticsData.responseMetrics.medianResponseTime}</p>
+                <p className="text-2xl font-bold text-green-600">{analyticsData?.responseMetrics?.medianResponseTime || '0m'}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-600">Fastest Response</p>
-                <p className="text-lg font-semibold text-emerald-600">{analyticsData.responseMetrics.fastestResponse}</p>
+                <p className="text-lg font-semibold text-emerald-600">{analyticsData?.responseMetrics?.fastestResponse || '0m'}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-600">Slowest Response</p>
-                <p className="text-lg font-semibold text-orange-600">{analyticsData.responseMetrics.slowestResponse}</p>
+                <p className="text-lg font-semibold text-orange-600">{analyticsData?.responseMetrics?.slowestResponse || '0m'}</p>
               </div>
             </div>
           </CardContent>
@@ -381,8 +376,8 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(analyticsData.channelVolume).map(([channel, count]) => {
-              const total = Object.values(analyticsData.channelVolume).reduce((a, b) => a + b, 0)
+            {Object.entries(analyticsData?.channelVolume || {}).map(([channel, count]) => {
+              const total = Object.values(analyticsData?.channelVolume || {}).reduce((a, b) => a + b, 0)
               const percentage = total > 0 ? (count / total) * 100 : 0
               
               return (
@@ -425,7 +420,7 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {analyticsData.dailyStats.map((stat, index) => (
+            {(analyticsData?.dailyStats || []).map((stat, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium w-24">
@@ -456,19 +451,16 @@ export default function AnalyticsPage() {
       </Card>
 
       {/* Top Contacts */}
-      <Card>
+      <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Top Contacts
-          </CardTitle>
+          <CardTitle>Top Contacts</CardTitle>
           <CardDescription>
             Most active contacts by message volume
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {analyticsData.topContacts.map((contact, index) => (
+            {(analyticsData?.topContacts || []).map((contact, index) => (
               <div key={contact.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">

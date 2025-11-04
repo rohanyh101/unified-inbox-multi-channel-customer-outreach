@@ -22,21 +22,15 @@ import {
   Phone,
   MessageSquare,
   ChevronDown,
-  Clock
+  Clock,
+  Sparkles,
+  PenTool,
+  Layers,
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import RichTextEditor from './RichTextEditor';
-import MediaAttachmentComponent from './MediaAttachment';
 import MessageTemplates from './MessageTemplates';
-
-interface MediaAttachment {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url: string;
-  preview?: string;
-}
 
 interface MessageTemplate {
   id: string;
@@ -49,7 +43,7 @@ interface MessageTemplate {
 }
 
 interface EnhancedMessageComposerProps {
-  onSendMessage: (content: string, attachments?: MediaAttachment[], channel?: string) => Promise<void>;
+  onSendMessage: (content: string, channel?: string) => Promise<void>;
   onScheduleMessage?: (content: string, scheduledAt: Date, channel: string) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
@@ -74,7 +68,6 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
   defaultChannel = "SMS"
 }) => {
   const [message, setMessage] = useState('');
-  const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
   const [isRichTextMode, setIsRichTextMode] = useState(showRichText);
   const [isSending, setIsSending] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
@@ -86,16 +79,15 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = async () => {
-    if (!message.trim() && attachments.length === 0) {
-      toast.error('Please enter a message or attach a file');
+    if (!message.trim()) {
+      toast.error('Please enter a message');
       return;
     }
 
     setIsSending(true);
     try {
-      await onSendMessage(message, attachments, selectedChannel);
+      await onSendMessage(message, selectedChannel);
       setMessage('');
-      setAttachments([]);
       toast.success(`${selectedChannel} message sent successfully`);
     } catch (error) {
       console.error('Error sending message:', error);
@@ -262,10 +254,10 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
               size="sm"
               onClick={() => setShowTemplatesModal(true)}
               disabled={disabled}
-              className="h-7 w-7 p-0"
-              title="Templates"
+              className="h-8 w-8 p-0 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+              title="Message Templates"
             >
-              <FileText className="h-3 w-3" />
+              <Sparkles className="h-4 w-4" />
             </Button>
           )}
           
@@ -276,10 +268,14 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
             size="sm"
             onClick={() => setIsRichTextMode(!isRichTextMode)}
             disabled={disabled}
-            className={`h-7 w-7 p-0 ${isRichTextMode ? 'bg-blue-100' : ''}`}
-            title={isRichTextMode ? 'Plain text' : 'Rich text'}
+            className={`h-8 w-8 p-0 transition-colors ${
+              isRichTextMode 
+                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
+                : 'hover:bg-blue-50 hover:text-blue-600'
+            }`}
+            title={isRichTextMode ? 'Switch to plain text' : 'Enable rich text formatting'}
           >
-            <Type className="h-3 w-3" />
+            <PenTool className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -310,39 +306,14 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
               size="sm"
               onClick={() => insertAtCursor(' 😊')}
               disabled={disabled}
-              className="absolute bottom-2 right-2 h-6 w-6 p-0"
+              className="absolute bottom-2 right-2 h-7 w-7 p-0 hover:bg-yellow-50 hover:text-yellow-600 transition-colors"
               title="Add emoji"
             >
-              <Smile className="h-3 w-3" />
+              <Smile className="h-4 w-4" />
             </Button>
           </>
         )}
       </div>
-
-      {/* Media Attachments - Compact */}
-      {attachments.length > 0 && (
-        <div className="max-h-32 overflow-y-auto">
-          <MediaAttachmentComponent
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            maxFiles={3}
-            maxFileSize={5}
-            allowedTypes={['image/*', 'video/*', '.pdf', '.doc', '.docx']}
-            showPreview={false}
-          />
-        </div>
-      )}
-
-      {/* Attachment Upload Area - Only show when no attachments */}
-      {attachments.length === 0 && (
-        <MediaAttachmentComponent
-          attachments={attachments}
-          onAttachmentsChange={setAttachments}
-          maxFiles={3}
-          maxFileSize={5}
-          allowedTypes={['image/*', 'video/*', '.pdf', '.doc', '.docx']}
-        />
-      )}
 
       {/* Send Button with Teams/Slack style dropdown */}
       <div className="flex justify-end">
@@ -350,7 +321,7 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
-                disabled={disabled || isSending || isScheduling || (!message.trim() && attachments.length === 0)}
+                disabled={disabled || isSending || isScheduling || !message.trim()}
                 size="sm"
                 className="min-w-[100px] px-3"
               >
@@ -370,7 +341,7 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
             <DropdownMenuContent align="end" className="w-48 !bg-white !border !border-gray-200 !shadow-lg !rounded-md !p-1 !z-50" style={{backgroundColor: '#ffffff', border: '1px solid #e5e7eb'}}>
               <DropdownMenuItem 
                 onClick={handleSend} 
-                disabled={disabled || isSending || isScheduling || (!message.trim() && attachments.length === 0)}
+                disabled={disabled || isSending || isScheduling || !message.trim()}
                 className="cursor-pointer !hover:bg-gray-100 !focus:bg-gray-100 !px-3 !py-2 !text-gray-900 !bg-white rounded-sm"
                 style={{backgroundColor: '#ffffff', color: '#111827'}}
               >
@@ -392,7 +363,7 @@ const EnhancedMessageComposer: React.FC<EnhancedMessageComposerProps> = ({
         ) : (
           <Button 
             onClick={handleSend}
-            disabled={disabled || isSending || (!message.trim() && attachments.length === 0)}
+            disabled={disabled || isSending || !message.trim()}
             size="sm"
             className="min-w-[80px]"
           >

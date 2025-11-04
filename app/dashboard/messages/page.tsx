@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Phone, MessageSquare, Mail, Send, ArrowLeft, Search, Filter, CheckCircle2, AlertCircle, User, Calendar, Wifi, WifiOff, Check } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import ContactProfileModal from "@/components/ContactProfileModal";
 
@@ -50,6 +50,7 @@ interface ContactThread {
 
 export default function MessagesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   // React Query hooks for data fetching
   const { data: messages = [], isLoading: messagesLoading, error: messagesError } = useMessages();
@@ -98,6 +99,48 @@ export default function MessagesPage() {
     }
   }, [messages, contacts]);
 
+  // Handle URL parameter to auto-select contact
+  useEffect(() => {
+    const contactIdFromUrl = searchParams.get('contact');
+    console.log('🔗 URL contact parameter:', contactIdFromUrl);
+    console.log('📊 Contacts loading:', contactsLoading, 'Contacts count:', contacts.length);
+    console.log('� Contact threads count:', contactThreads.length);
+    console.log('� All contacts:', contacts.map(c => ({ id: c.id, name: c.name })));
+    
+    if (contactIdFromUrl && !contactsLoading && contacts.length > 0) {
+      console.log('� Processing URL contact parameter:', contactIdFromUrl);
+      
+      // Try to find existing thread for this contact
+      const existingThread = contactThreads.find(
+        thread => thread.contact.id === contactIdFromUrl
+      );
+      
+      if (existingThread) {
+        console.log('✅ Found existing thread for contact:', existingThread.contact.name);
+        setSelectedThread(existingThread);
+        setSelectedContact(contactIdFromUrl);
+      } else {
+        // Contact exists but no messages yet - create empty thread
+        const contact = contacts.find(c => c.id === contactIdFromUrl);
+        if (contact) {
+          console.log('📝 Creating empty thread for contact:', contact.name);
+          const emptyThread: ContactThread = {
+            contact,
+            messages: [],
+            lastMessage: null as any,
+            unreadCount: 0,
+            hasUnread: false
+          };
+          setSelectedThread(emptyThread);
+          setSelectedContact(contactIdFromUrl);
+        } else {
+          console.log('❌ Contact not found in contacts list:', contactIdFromUrl);
+          console.log('❌ Available contact IDs:', contacts.map(c => c.id));
+        }
+      }
+    }
+  }, [searchParams, contactThreads, contacts, contactsLoading]);
+
   // Store selected contact ID to avoid dependency issues
   const selectedContactId = selectedThread?.contact.id;
 
@@ -131,6 +174,7 @@ export default function MessagesPage() {
     const contactMap = new Map(contacts.map(c => [c.id, c]));
     const threadsMap = new Map<string, ContactThread>();
 
+    // First, process messages to create threads for contacts with messages
     messages.forEach(message => {
       if (!message.contact) return;
       
@@ -162,10 +206,38 @@ export default function MessagesPage() {
       }
     });
 
-    // Sort threads by last message timestamp (newest first)
-    return Array.from(threadsMap.values()).sort((a, b) => 
-      new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
-    );
+    // Add contacts without messages as empty threads
+    contacts.forEach(contact => {
+      if (!threadsMap.has(contact.id)) {
+        threadsMap.set(contact.id, {
+          contact,
+          messages: [],
+          lastMessage: null as any,
+          unreadCount: 0,
+          hasUnread: false,
+        });
+      }
+    });
+
+    const allThreads = Array.from(threadsMap.values());
+
+    // Sort threads: first by whether they have messages (message threads first), 
+    // then by last message timestamp for threads with messages,
+    // then by contact name for threads without messages
+    return allThreads.sort((a, b) => {
+      const aHasMessages = a.messages.length > 0;
+      const bHasMessages = b.messages.length > 0;
+
+      if (aHasMessages && !bHasMessages) return -1;
+      if (!aHasMessages && bHasMessages) return 1;
+
+      if (aHasMessages && bHasMessages) {
+        return new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime();
+      }
+
+      // Both have no messages, sort by contact name
+      return a.contact.name.localeCompare(b.contact.name);
+    });
   };
 
   const getFilteredThreads = () => {
@@ -330,11 +402,11 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          {/* Loading state */}
-          {(messagesLoading || contactsLoading) ? (
+          {/* Loading state - only show loading if contacts are still loading */}
+          {contactsLoading ? (
             <div className="p-4 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-              <p className="text-sm text-gray-500">Loading conversations...</p>
+              <p className="text-sm text-gray-500">Loading contacts...</p>
             </div>
           ) : contacts.length === 0 ? (
             <div className="p-4">
@@ -395,36 +467,55 @@ export default function MessagesPage() {
                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                               )}
                               <span className="text-xs text-gray-500">
-                                {new Date(thread.lastMessage.timestamp).toLocaleDateString()}
+                                {thread.lastMessage ? 
+                                  new Date(thread.lastMessage.timestamp).toLocaleDateString() : 
+                                  'No messages yet'
+                                }
                               </span>
                             </div>
                           </div>
 
                           {/* Channel badges */}
                           <div className="flex items-center gap-1 mb-2">
-                            {Array.from(new Set(thread.messages.map(m => m.channel))).map(channel => (
-                              <Badge key={channel} className={`${getChannelColor(channel)} text-xs`}>
-                                {getChannelIcon(channel)}
-                                <span className="ml-1">{channel}</span>
+                            {thread.messages.length > 0 ? (
+                              Array.from(new Set(thread.messages.map(m => m.channel))).map(channel => (
+                                <Badge key={channel} className={`${getChannelColor(channel)} text-xs`}>
+                                  {getChannelIcon(channel)}
+                                  <span className="ml-1">{channel}</span>
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-600 text-xs">
+                                <User className="h-3 w-3" />
+                                <span className="ml-1">New Contact</span>
                               </Badge>
-                            ))}
+                            )}
                           </div>
 
                           {/* Last message preview */}
                           <div className={`text-sm truncate ${
                             thread.hasUnread ? 'font-medium text-gray-800' : 'text-gray-600'
                           }`}>
-                            {thread.lastMessage.direction === 'OUTBOUND' ? 'You: ' : ''}
-                            <MessageContent 
-                              content={thread.lastMessage.content} 
-                              className="inline truncate"
-                            />
+                            {thread.lastMessage ? (
+                              <>
+                                {thread.lastMessage.direction === 'OUTBOUND' ? 'You: ' : ''}
+                                <MessageContent 
+                                  content={thread.lastMessage.content} 
+                                  className="inline truncate"
+                                />
+                              </>
+                            ) : (
+                              <span className="text-gray-400 italic">Click to start conversation</span>
+                            )}
                           </div>
                           
                           {/* Scheduled message indicator */}
-                          {thread.lastMessage.status === 'SCHEDULED' && (
+                          {thread.lastMessage && thread.lastMessage.status === 'SCHEDULED' && (
                             <div className="mt-1">
-                              <div className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1">
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 px-2 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 border border-blue-200/50 shadow-sm">
+                                <Calendar className="h-3 w-3" />
+                                <span>Scheduled</span>
+                                <span className="text-blue-600">•</span>
                                 {(() => {
                                   const scheduledDate = new Date(thread.lastMessage.scheduledAt || thread.lastMessage.timestamp);
                                   const now = new Date();
@@ -434,7 +525,7 @@ export default function MessagesPage() {
                                   if (scheduledDateOnly.getTime() === today.getTime()) {
                                     return `Today ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                   } else {
-                                    return scheduledDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                                    return `${scheduledDate.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                   }
                                 })()}
                               </div>
@@ -444,23 +535,22 @@ export default function MessagesPage() {
                           {/* Status indicators */}
                           <div className="flex items-center justify-between mt-2">
                             <div className="flex items-center space-x-1">
-                              {thread.lastMessage.status === 'DELIVERED' && (
+                              {thread.lastMessage && thread.lastMessage.status === 'DELIVERED' && (
                                 <>
-                                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                  <Check className="h-3 w-3 text-green-500" />
                                   <span className="text-xs text-gray-500">DELIVERED</span>
                                 </>
                               )}
-                              {thread.lastMessage.status === 'FAILED' && (
+                              {thread.lastMessage && thread.lastMessage.status === 'SENT' && (
+                                <>
+                                  <Check className="h-3 w-3 text-green-500" />
+                                  <span className="text-xs text-gray-500">SENT</span>
+                                </>
+                              )}
+                              {thread.lastMessage && thread.lastMessage.status === 'FAILED' && (
                                 <>
                                   <AlertCircle className="h-3 w-3 text-red-500" />
                                   <span className="text-xs text-gray-500">FAILED</span>
-                                </>
-                              )}
-
-                              {(thread.lastMessage.status === 'SENT' || thread.lastMessage.status === 'DELIVERED') && (
-                                <>
-                                  <Check className="h-3 w-3 text-green-500" />
-                                  <span className="text-xs text-gray-500">{thread.lastMessage.status}</span>
                                 </>
                               )}
                               {/* For scheduled messages, the pill above shows the info, so just show empty space */}
@@ -520,9 +610,23 @@ export default function MessagesPage() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {selectedThread.messages
-                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                  .map((message) => (
+                {selectedThread.messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <MessageSquare className="h-16 w-16 text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No messages yet
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      Start a conversation with {selectedThread.contact.name}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Use the message composer below to send your first message
+                    </p>
+                  </div>
+                ) : (
+                  selectedThread.messages
+                    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                    .map((message) => (
                     <div key={message.id} className={`flex ${
                       message.direction === 'OUTBOUND' ? 'justify-end' : 'justify-start'
                     }`}>
@@ -537,7 +641,12 @@ export default function MessagesPage() {
                             <span className="ml-1">{message.channel}</span>
                           </Badge>
                           {message.status === 'SCHEDULED' && (
-                            <div className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                            <div className={`px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 ${
+                              message.direction === 'OUTBOUND' 
+                                ? 'bg-blue-600/20 text-blue-100 border border-blue-400/30' 
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              <Calendar className="h-3 w-3" />
                               {(() => {
                                 const scheduledDate = new Date(message.scheduledAt || message.timestamp);
                                 const now = new Date();
@@ -546,9 +655,9 @@ export default function MessagesPage() {
                                 const scheduledDateOnly = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate());
                                 
                                 if (scheduledDateOnly.getTime() === today.getTime()) {
-                                  return `today ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                  return `Today ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                 } else if (scheduledDateOnly.getTime() === tomorrow.getTime()) {
-                                  return `tomorrow ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                  return `Tomorrow ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                 } else {
                                   return `${scheduledDate.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                                 }
@@ -560,7 +669,7 @@ export default function MessagesPage() {
                           content={message.content} 
                           className="text-sm"
                         />
-                        <div className="flex items-center justify-between mt-1">
+                        <div className="flex items-center justify-between mt-1 gap-1">
                           <p className={`text-xs ${
                             message.direction === 'OUTBOUND' ? 'text-blue-100' : 'text-gray-500'
                           }`}>
@@ -569,31 +678,30 @@ export default function MessagesPage() {
                               : new Date(message.timestamp).toLocaleString()}
                           </p>
                           {message.direction === 'OUTBOUND' && (
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center space-x-1 ml-1">
                               {message.status === 'DELIVERED' && (
-                                <CheckCircle2 className="h-3 w-3 text-blue-100" />
+                                <Check className="h-3 w-3 text-green-300" />
+                              )}
+                              {message.status === 'SENT' && (
+                                <Check className="h-3 w-3 text-green-300" />
                               )}
                               {message.status === 'FAILED' && (
                                 <AlertCircle className="h-3 w-3 text-red-300" />
                               )}
-
-                              {(message.status === 'SENT' || message.status === 'DELIVERED') && (
-                                <Check className="h-3 w-3 text-green-300" />
-                              )}
-
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                )}
                 {/* Scroll target for auto-scroll to bottom */}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Compact Message Composer */}
               <CompactMessageComposer
-                onSendMessage={async (content: string, attachments?: any[], channel?: string) => {
+                onSendMessage={async (content: string, channel?: string) => {
                   // Update state for UI consistency
                   setMessageContent(content);
                   setMessageChannel(channel || 'SMS');
@@ -604,6 +712,13 @@ export default function MessagesPage() {
                 }}
                 onScheduleMessage={async (content: string, scheduledAt: Date, channel: string) => {
                   try {
+                    console.log('📅 Scheduling message:', { 
+                      contactId: selectedThread.contact.id, 
+                      content, 
+                      channel, 
+                      scheduledAt: scheduledAt.toISOString() 
+                    });
+                    
                     // First, schedule the message in the database
                     const response = await fetch('/api/messages/schedule', {
                       method: 'POST',
@@ -619,10 +734,17 @@ export default function MessagesPage() {
                     });
 
                     if (!response.ok) {
-                      throw new Error('Failed to schedule message');
+                      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                      console.error('❌ Schedule API error:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorData
+                      });
+                      throw new Error(errorData.error || `Failed to schedule message: ${response.status} ${response.statusText}`);
                     }
 
                     const result = await response.json();
+                    console.log('✅ Schedule API success:', result);
                     
                     // Create the scheduled message object
                     const scheduledMessage = {

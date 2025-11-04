@@ -6,11 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, Phone, Mail, Plus, Edit, MessageSquare, Eye, Calendar } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, Plus, Edit, MessageSquare, Eye, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ContactProfileModal from "@/components/ContactProfileModal";
-import MessageSchedulerModal from "@/components/MessageSchedulerModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Contact {
   id: string;
@@ -36,7 +42,9 @@ export default function ContactsPage() {
   // Modal state
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showSchedulerModal, setShowSchedulerModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetchContacts();
@@ -57,22 +65,57 @@ export default function ContactsPage() {
   };
 
   const addContact = async () => {
+    // Validate name
     if (!formData.name.trim()) {
       toast.error("Name is required");
       return;
     }
 
-    if (!formData.phone && !formData.email) {
-      toast.error("Either phone or email is required");
+    // Validate phone is required
+    if (!formData.phone.trim()) {
+      toast.error("Phone number is required");
+      return;
+    }
+
+    // Validate email is required
+    if (!formData.email.trim()) {
+      toast.error("Email address is required");
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    // Validate phone format
+    const phoneRegex = /^[\+]?[\d\s\-\(\)\.]{10,}$/;
+    if (!phoneRegex.test(formData.phone.trim())) {
+      toast.error("Please enter a valid phone number (at least 10 digits)");
       return;
     }
 
     setLoading(true);
     try {
+      // Prepare payload - only send non-empty strings
+      const payload: any = {
+        name: formData.name.trim()
+      };
+      
+      if (formData.phone.trim()) {
+        payload.phone = formData.phone.trim();
+      }
+      
+      if (formData.email.trim()) {
+        payload.email = formData.email.trim();
+      }
+
       const response = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
@@ -81,14 +124,52 @@ export default function ContactsPage() {
         setShowAddForm(false);
         fetchContacts();
       } else {
-        const error = await response.json();
-        toast.error(error.message || "Failed to add contact");
+        const errorData = await response.json();
+        if (errorData.error && Array.isArray(errorData.error)) {
+          // Handle Zod validation errors
+          const errorMessages = errorData.error.map((err: any) => err.message).join(", ");
+          toast.error(`Validation error: ${errorMessages}`);
+        } else {
+          toast.error(errorData.message || "Failed to add contact");
+        }
       }
     } catch (error) {
+      console.error('Error adding contact:', error);
       toast.error("Failed to add contact");
     } finally {
       setLoading(false);
     }
+  };
+
+  const deleteContact = async () => {
+    if (!contactToDelete) return;
+    
+    setDeleteLoading(true);
+    try {
+      const response = await fetch(`/api/contacts/${contactToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success(`${contactToDelete.name} has been deleted`);
+        setShowDeleteDialog(false);
+        setContactToDelete(null);
+        fetchContacts();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || "Failed to delete contact");
+      }
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      toast.error("Failed to delete contact");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteClick = (contact: Contact) => {
+    setContactToDelete(contact);
+    setShowDeleteDialog(true);
   };
 
   return (
@@ -131,25 +212,28 @@ export default function ContactsPage() {
                   placeholder="Contact name"
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">Phone Number *</Label>
                 <Input
                   id="phone"
-                  placeholder="+1234567890"
+                  placeholder="+1 (555) 123-4567"
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="contact@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  required
                 />
               </div>
               <div className="flex gap-2">
@@ -221,13 +305,11 @@ export default function ContactsPage() {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    onClick={() => {
-                      setSelectedContact(contact);
-                      setShowSchedulerModal(true);
-                    }}
+                    onClick={() => handleDeleteClick(contact)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
-                    <Calendar className="h-4 w-4 mr-1" />
-                    Schedule
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
                   </Button>
                 </div>
               </CardContent>
@@ -260,19 +342,39 @@ export default function ContactsPage() {
         }}
       />
 
-      {/* Message Scheduler Modal */}
-      <MessageSchedulerModal
-        open={showSchedulerModal}
-        onOpenChange={(open) => {
-          setShowSchedulerModal(open);
-          if (!open) setSelectedContact(null);
-        }}
-        contacts={contacts}
-        selectedContactId={selectedContact?.id}
-        onScheduled={() => {
-          toast.success("Message scheduled successfully!")
-        }}
-      />
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Contact</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <span className="font-semibold">{contactToDelete?.name}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200 mt-4">
+            <strong>Warning:</strong> This will permanently delete the contact and all associated chat history. This action cannot be undone.
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setContactToDelete(null);
+              }}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={deleteContact}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? "Deleting..." : "Delete Contact"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
